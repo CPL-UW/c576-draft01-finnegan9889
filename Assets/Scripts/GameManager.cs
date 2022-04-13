@@ -2,13 +2,15 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using System.IO;
+using System;
 
 public class GameManager : MonoBehaviour
 {
     public List<Card> cDeck = new List<Card>(); //carb deck
-    public List<Card> cDiscard = new List<Card>(); //carb discard
+    public List<Card> cDiscard = new List<Card>(); //carb discard deck
     public List<Card> pDeck = new List<Card>(); //protein deck
-    public List<Card> pDiscard = new List<Card>(); //protein discard
+    public List<Card> pDiscard = new List<Card>(); //protein discard deck
 
     public Transform[] handSlots;
     public bool[] availableHandSlots;
@@ -23,14 +25,32 @@ public class GameManager : MonoBehaviour
     public int cMeterValue;
     public int pMeterValue;
     
+    //Object storing information about what happens on any given turn (passed into JSON)
+    //Values assigned in adjustMeter()
+    public class TurnData
+    {
+        public string moveType; //Play or Discard
+        public int cardType; 
+        public int calories; 
+        public bool goodPlay; //a good play moves the corresponding meter closer to center
+
+        public TurnData(string moveType, Card card, bool goodPlay){
+            this.moveType = moveType;
+            this.cardType = card.type;
+            this.calories = card.calories;
+            this.goodPlay = goodPlay;
+        }
+    }
+    private const string path = "Assets/Logs/turnLog.json";
+    private static StreamWriter Writer = new(path, true); //for writing dara to JSON
 
     public void DrawCard(int cardType){
         //Debug.Log(cardType);
         Card cardDrawn = null;
         if(cardType == 0 && cDeck.Count >= 1){
-            cardDrawn = cDeck[Random.Range(0, cDeck.Count)]; //later, deck will be ordered randomly and we will draw off the top
+            cardDrawn = cDeck[UnityEngine.Random.Range(0, cDeck.Count)]; //later, deck will be ordered randomly and we will draw off the top
         }else if(cardType == 1 && pDeck.Count >= 1){
-            cardDrawn = pDeck[Random.Range(0, pDeck.Count)]; //later, deck will be ordered randomly and we will draw off the top
+            cardDrawn = pDeck[UnityEngine.Random.Range(0, pDeck.Count)]; //later, deck will be ordered randomly and we will draw off the top
         } 
         if(cardDrawn == null){
             return;
@@ -58,11 +78,11 @@ public class GameManager : MonoBehaviour
             if(fieldSlots[i].availablility == true){
                 card.transform.position = new Vector3(fieldSlots[i].pos.position.x, fieldSlots[i].pos.position.y, fieldSlots[i].pos.position.z - 1);
                 card.isPlayed = true;
-                card.cardSlot = fieldSlots[i]; //sets card's position variable of card on field
+                card.cardSlot = fieldSlots[i]; //sets position variable of card on field
                 availableHandSlots[card.handIndex] = true;
                 card.handIndex = -1;
                 fieldSlots[i].availablility = false;
-
+                
                 adjustMeter(card, true);
 
                 return;
@@ -104,24 +124,57 @@ public class GameManager : MonoBehaviour
     //Change corresponding meter's value depending on card's calorie count
     //addition == true means we are adding the value to the meter. false means we subtract
     public void adjustMeter(Card card, bool addition){
+        bool goodPlay;
+        string moveType;
+        if(addition){
+            moveType = "Play";
+        }else{
+            moveType = "Discard";
+        }
+        
         int weight = card.calories / 10;
         if(addition && card.type == 0){ // add carb
+            if( Math.Abs(50 - (cMeterValue + weight)) <=  Math.Abs(50 - (cMeterValue))){
+                goodPlay = true;
+            }else{
+                goodPlay = false;
+            }
             cMeterValue += weight;
             cMeter.SetValue(cMeterValue);
         }else if(addition && card.type == 1){ // add protein
+            if( Math.Abs(50 - (pMeterValue + weight)) <=  Math.Abs(50 - (pMeterValue))){
+                goodPlay = true;
+            }else{
+                goodPlay = false;
+            }
             pMeterValue += weight;
             pMeter.SetValue(pMeterValue);
         }else if(!addition && card.type == 0){ // subtract carb
+            if( Math.Abs(50 - (cMeterValue - weight)) <=  Math.Abs(50 - (cMeterValue))){
+                goodPlay = true;
+            }else{
+                goodPlay = false;
+            }
             cMeterValue -= weight;
             cMeter.SetValue(cMeterValue);
         }else{ // subtract protein
+            if( Math.Abs(50 - (pMeterValue - weight)) <=  Math.Abs(50 - (pMeterValue))){
+                goodPlay = true;
+            }else{
+                goodPlay = false;
+            }
             pMeterValue -= weight;
             pMeter.SetValue(pMeterValue);
         }
+
+        //write data to JSON
+        Writer.WriteLine(JsonUtility.ToJson(new TurnData(moveType, card, goodPlay)));
+        Writer.Flush();
     }
 
     void Start(){
-        overweight = Random.Range(0, 2) == 1; //overweight = true, then high carb/protein start
+        Writer.WriteLine("Game Start:");
+        overweight = UnityEngine.Random.Range(0, 2) == 1; //overweight = true, then high carb/protein start
         initializeMeters();
     }
 
