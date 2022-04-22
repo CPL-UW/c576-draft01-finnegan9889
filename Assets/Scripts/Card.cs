@@ -4,25 +4,31 @@ using UnityEngine;
 
 public class Card : MonoBehaviour
 {
-    public bool isPlayed;
-    public int handIndex;
     private GameManager gm;
+    public bool isPlayed;
+    //public bool isSelected;
+    public int handIndex;
 
     public string title;
-    public int type; //0 = Carb, 1 = Protein
     public int calories;
 
     public FieldSlot cardSlot; //The field slot where this card is placed (position)
+
+    private void OnMouseDown(){
+        gm.selectedCard = this;
+        gm.DisplayCard(this);
+    }
 
     private void Start(){
         gm = FindObjectOfType<GameManager>();
     }
 
-    private void OnMouseDown(){
-        if(isPlayed == false){
-            gm.PlayCard(this);
-        }else{
-            gm.Discard(this);
+    private void OnMouseOver(){
+        if(!isPlayed){
+            if(Input.GetMouseButtonDown(1)){ //right click discards
+                gm.Discard(this);
+            } 
         }
+        
     }
 }
